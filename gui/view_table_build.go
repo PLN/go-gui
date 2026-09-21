@@ -11,12 +11,15 @@ package gui
 func tableBuildRow(
 	cfg *TableCfg, rowIdx int, columnWidths []float32,
 	cellBorder float32, selected map[int]bool,
-	multiSelect bool, colorHover Color,
+	multiSelect bool,
 	onSelect func(map[int]bool, int, EventCtx),
 	activeRowIdx int, activeKey string,
 ) View {
 	r := cfg.Data[rowIdx]
 	isSelected := selected[rowIdx]
+	// The keyboard-active row is the Focus state: arrow-key
+	// movement stays visible through the theme's focus fill.
+	isActive := rowIdx == activeRowIdx && activeRowIdx >= 0
 	cells := make([]View, 0, len(r.Cells))
 
 	for colIdx, cell := range r.Cells {
@@ -63,7 +66,7 @@ func tableBuildRow(
 		}
 
 		cellOnClick := cell.OnClick
-		ch := colorHover
+		ch := cfg.Colors.Hover
 		var cellOnHover func(EventCtx)
 		if cellOnClick != nil {
 			cellOnHover = func(ctx EventCtx) {
@@ -88,23 +91,20 @@ func tableBuildRow(
 		}))
 	}
 
-	rowColor := ColorTransparent
-	if isSelected {
-		// Selection paints the subtle wash, not the full accent
-		// slab; focus is the ring, not a second fill
-		// (visual-refresh §4.3).
-		rowColor = cfg.ColorSelectSubtle
-	} else if rowIdx == activeRowIdx && activeRowIdx >= 0 {
-		rowColor = colorHover
-	} else if cfg.ColorRowAlt != nil && rowIdx%2 == 1 {
-		rowColor = *cfg.ColorRowAlt
+	// The resting fill is transparent, or the alternate color on odd
+	// rows; it lands in Base after resolve ran, so it changes only the
+	// resting fill.
+	base := ColorTransparent
+	if cfg.ColorRowAlt != nil && rowIdx%2 == 1 {
+		base = *cfg.ColorRowAlt
 	}
+	bg, bgHover := rowFill(cfg.Colors, base, isSelected, isActive)
 
 	rowOnClick := r.OnClick
 	ri := rowIdx
 
 	return Row(ContainerCfg{
-		Color:      rowColor,
+		Color:      bg,
 		Spacing:    Some(-cellBorder),
 		Padding:    NoPadding,
 		SizeBorder: NoBorder,
@@ -129,9 +129,7 @@ func tableBuildRow(
 		OnHover: func(ctx EventCtx) {
 			if onSelect != nil {
 				ctx.Window.SetMouseCursorPointingHand()
-				if !isSelected {
-					ctx.Layout.Shape.Color = colorHover
-				}
+				ctx.Layout.Shape.Color = bgHover
 			}
 		},
 	})
@@ -144,7 +142,7 @@ func tableBuildRow(
 // layout, whose pinned header is row 0 and never part of the body.
 func tableBuildRows(
 	cfg *TableCfg, columnWidths []float32, cellBorder float32,
-	selected map[int]bool, multiSelect bool, colorHover Color,
+	selected map[int]bool, multiSelect bool,
 	onSelect func(map[int]bool, int, EventCtx),
 	activeRowIdx int, navKey string,
 	first, last, lastRowIdx, dataStart int,
@@ -171,7 +169,7 @@ func tableBuildRows(
 		}
 		rows = append(rows, tableBuildRow(
 			cfg, rowIdx, columnWidths, cellBorder,
-			selected, multiSelect, colorHover, onSelect,
+			selected, multiSelect, onSelect,
 			activeRowIdx, navKey))
 
 		// Horizontal separator.
@@ -215,7 +213,7 @@ func tableBuildRows(
 func tableFreezeLayout(
 	cfg *TableCfg, columnWidths []float32, cellBorder float32,
 	rowSpacing float32, selected map[int]bool,
-	multiSelect bool, colorHover Color,
+	multiSelect bool,
 	onSelect func(map[int]bool, int, EventCtx),
 	bodyRows []View,
 	scrollID string,
@@ -226,7 +224,7 @@ func tableFreezeLayout(
 	// Header zone: row 0 + optional separator.
 	headerViews := []View{
 		tableBuildRow(cfg, 0, columnWidths, cellBorder,
-			selected, multiSelect, colorHover, onSelect,
+			selected, multiSelect, onSelect,
 			activeRowIdx, activeKey),
 	}
 
