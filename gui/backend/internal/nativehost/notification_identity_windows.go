@@ -36,9 +36,11 @@ func notificationIdentityForKey(executable, key string) notificationIdentity {
 	guid.Data3 = (guid.Data3 & 0x0fff) | 0x8000 // custom name-derived UUID
 	guid.Data4[0] = (guid.Data4[0] & 0x3f) | 0x80
 	return notificationIdentity{
-		executable: executable, appID: "GoGui.App." + id,
+		// AUMID and protocol scheme are Windows registry identity,
+		// not widget IDs.
+		executable: executable, appID: "GoGui.App." + id, // ergonomics-audit:not-an-id
 		name:     strings.TrimSuffix(filepath.Base(executable), filepath.Ext(executable)),
-		protocol: "gogui-notification-" + id, activator: guid,
+		protocol: "gogui-notification-" + id, activator: guid, // ergonomics-audit:not-an-id
 	}
 }
 
